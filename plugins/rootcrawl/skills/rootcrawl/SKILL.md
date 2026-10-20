@@ -32,6 +32,6 @@ The script is `scripts/rootcrawl.py` in this skill's base directory. It needs Py
 
 - The report ends with the token cost of reading everything directly; mention the saving
   when it's large.
-- Cache lives in `<folder>/.rootcrawl/`; `--refresh` rebuilds it. Read-only folders just
-  aren't cached.
+- The cache lives in the user's cache folder, never in the data folder; `--refresh` rebuilds it.
+- `profile FILE` profiles a single file.
 - Only profile folders the user pointed you to or that the task clearly needs.

@@ -10,8 +10,9 @@ the slices that matter are read after that.
     rootcrawl.py peek FILE [--lines 40]     # the first lines of any text file
 
 Standard library only; Pillow (EXIF) and openpyxl (xlsx) are used when installed.
-Profiles are cached per file (size + mtime) in PATH/.rootcrawl/, so a second run is instant
-and only changed files are read again. Nothing leaves the machine.
+Profiles are cached per file (size + mtime) in the user's cache folder (never inside the data
+folder), so a second run is instant and only changed files are read again. Nothing leaves the
+machine.
 """
 import argparse
 import collections
@@ -32,7 +33,7 @@ JSONS = {'.json', '.jsonl', '.ndjson'}
 TEXT = {'.txt', '.md', '.log', '.py', '.js', '.ts', '.dart', '.java', '.kt', '.go', '.rs', '.c', '.h', '.cpp',
         '.cs', '.rb', '.php', '.sh', '.yaml', '.yml', '.toml', '.ini', '.xml', '.html', '.css', '.sql'}
 SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.rootcrawl', '.venv', 'venv', 'build', '.dart_tool', '.idea'}
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 
 def human(n):
@@ -102,6 +103,8 @@ def profile_table(path, sample_rows=3, max_rows=200000):
     out = {'kind': 'table', 'rows': n, 'cols': []}
     for c in cols:
         t = [k for k, _ in c['types'].most_common() if k != 'empty'][:1]
+        if c['types']['int'] and c['types']['float']:
+            t = ['number']
         d = {'name': c['name'], 'type': t[0] if t else 'empty', 'empty%': round(100 * c['empty'] / max(n, 1), 1)}
         if c['nums']:
             d.update(min=min(c['nums']), max=max(c['nums']), mean=round(statistics.fmean(c['nums']), 4))
@@ -145,20 +148,21 @@ def shape_of(x, depth=0):
 
 def profile_json(path):
     if path.lower().endswith(('.jsonl', '.ndjson')):
-        n, first, keys = 0, None, collections.Counter()
+        n, bad, first, keys = 0, 0, None, collections.Counter()
         with open(path, encoding='utf-8', errors='replace') as f:
             for line in f:
                 if not line.strip():
                     continue
-                n += 1
                 try:
                     o = json.loads(line)
                 except ValueError:
+                    bad += 1
                     continue
+                n += 1
                 first = first or o
                 if isinstance(o, dict):
                     keys.update(o.keys())
-        return {'kind': 'jsonl', 'records': n, 'keys': keys.most_common(25), 'first': shape_of(first)}
+        return {'kind': 'jsonl', 'records': n, 'bad_lines': bad, 'keys': keys.most_common(25), 'first': shape_of(first)}
     try:
         with open(path, encoding='utf-8', errors='replace') as f:
             o = json.load(f)
@@ -247,8 +251,17 @@ def walk(root):
             yield os.path.join(d, f)
 
 
+def cache_path(root):
+    """The cache lives in the user's cache folder, keyed by the folder's absolute path: the data
+    folder itself is never written to (and read-only folders are cached too)."""
+    base = os.environ.get('ROOTCRAWL_CACHE') or os.path.join(
+        os.environ.get('LOCALAPPDATA') or os.environ.get('XDG_CACHE_HOME') or os.path.join(os.path.expanduser('~'), '.cache'), 'rootcrawl')
+    key = hashlib.blake2b(os.path.abspath(root).encode('utf-8'), digest_size=10).hexdigest()
+    return os.path.join(base, key + '.json')
+
+
 def load_cache(root):
-    p = os.path.join(root, '.rootcrawl', 'cache.json')
+    p = cache_path(root)
     try:
         c = json.load(open(p, encoding='utf-8'))
         return c if c.get('v') == CACHE_VERSION else {'v': CACHE_VERSION, 'files': {}}
@@ -257,12 +270,14 @@ def load_cache(root):
 
 
 def save_cache(root, cache):
-    d = os.path.join(root, '.rootcrawl')
+    p = cache_path(root)
     try:
-        os.makedirs(d, exist_ok=True)
-        json.dump(cache, open(os.path.join(d, 'cache.json'), 'w', encoding='utf-8'))
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        cache['root'] = os.path.abspath(root)
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump(cache, f)
     except OSError:
-        pass  # read-only folder: no cache
+        pass  # no writable cache folder: just no cache
 
 
 def profile_folder(root, refresh=False, per_kind_limit=4000):
@@ -315,9 +330,15 @@ def report(root, files, fresh, secs, budget):
     imgs = {r: f for r, f in files.items() if f['p'].get('kind') == 'image'}
     raws = [r for r, f in files.items() if f['p'].get('kind') == 'raw']
     if imgs or raws:
-        w(f'\n## Photos: {len(imgs)} images, {len(raws)} RAW\n')
-        cams = collections.Counter(' '.join(x for x in (f['p'].get('make'), f['p'].get('model')) if x) or '(no EXIF)' for f in imgs.values())
-        soft = collections.Counter((f['p'].get('software') or '(none)').split(' (')[0] for f in imgs.values())
+        broken = sum(1 for f in imgs.values() if f['p'].get('error'))
+        unread = sum(1 for f in imgs.values() if 'size' not in f['p'] and not f['p'].get('error'))
+        w(f'\n## Photos: {len(imgs)} images, {len(raws)} RAW'
+          + (f', {broken} unreadable' if broken else '') + '\n')
+        if unread:
+            w(f'- EXIF read for {len(imgs) - unread - broken}; {unread} more only counted (profile a subfolder for detail)\n')
+        ok = [f for f in imgs.values() if 'size' in f['p']]
+        cams = collections.Counter(' '.join(x for x in (f['p'].get('make'), f['p'].get('model')) if x) or '(no EXIF)' for f in ok)
+        soft = collections.Counter((f['p'].get('software') or '(none)').split(' (')[0] for f in ok)
         sizes = [f['p']['size'] for f in imgs.values() if f['p'].get('size')]
         dates = sorted(f['p']['date'] for f in imgs.values() if f['p'].get('date'))
         w('- cameras: ' + ', '.join(f'{k} {v}' for k, v in cams.most_common(6)) + '\n')
@@ -362,8 +383,12 @@ def report(root, files, fresh, secs, budget):
                     w(f'### {r} › {s["sheet"]} ({s["dims"]})\n- header: {", ".join(map(str, s["header"]))}\n')
             elif kind in ('json', 'jsonl'):
                 shape = p.get('shape') or p.get('first')
-                w(f'### {r} — {human(f["size"])}' + (f', {p["records"]} records' if 'records' in p else '') + '\n')
-                w('- shape: ' + short(json.dumps(shape, ensure_ascii=False), 400) + '\n')
+                w(f'### {r} — {human(f["size"])}' + (f', {p["records"]} records' if 'records' in p else '')
+                  + (f', {p["bad_lines"]} unparsable lines' if p.get('bad_lines') else '') + '\n')
+                if p.get('error'):
+                    w(f'- not valid JSON: {p["error"]}\n')
+                else:
+                    w('- shape: ' + short(json.dumps(shape, ensure_ascii=False), 400) + '\n')
             else:
                 w(f'### {r} — {p["lines"]} lines' + (f', {p["time_range"][0]} → {p["time_range"][1]}' if p.get('time_range') else '') + '\n')
                 for t, c in p.get('top_lines', [])[:5]:
@@ -429,6 +454,11 @@ def cmd_table(a):
             names = [f'col{i}' for i in range(len(next(csv.reader(io.StringIO(head), dialect), [])))]
         r = csv.DictReader(f, fieldnames=names, dialect=dialect)
         cols = [c.strip() for c in a.cols.split(',')] if a.cols else r.fieldnames
+        known = set(r.fieldnames or [])
+        unknown = [c for c in cols + [c for c, _, _ in conds] if c not in known]
+        if unknown:
+            print(f'# unknown columns: {", ".join(dict.fromkeys(unknown))} (columns are: {", ".join(r.fieldnames or [])})')
+            return
         wr = csv.writer(sys.stdout)
         wr.writerow(cols)
         shown = matched = 0
@@ -514,6 +544,16 @@ def main():
     pk.add_argument('file')
     pk.add_argument('--lines', type=int, default=40)
     a = ap.parse_args()
+    target = getattr(a, 'path', None) or getattr(a, 'file', None)
+    if not os.path.exists(target):
+        sys.exit(f'rootcrawl: no such file or folder: {target}')
+    if a.cmd == 'profile' and os.path.isfile(a.path):
+        ext = os.path.splitext(a.path)[1].lower()
+        print(f'# Root Crawl: {os.path.abspath(a.path)} ({human(os.path.getsize(a.path))})')
+        print(json.dumps(profile_file(a.path, ext), ensure_ascii=False, indent=1, default=str)[: a.budget * 4])
+        return
+    if a.cmd in ('images', 'pairs') and not os.path.isdir(a.path):
+        sys.exit(f'rootcrawl: {a.cmd} needs a folder: {a.path}')
     if a.cmd == 'profile':
         files, fresh, secs = profile_folder(a.path, refresh=a.refresh)
         print(report(a.path, files, fresh, secs, a.budget))

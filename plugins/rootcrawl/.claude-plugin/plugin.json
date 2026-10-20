@@ -1,6 +1,6 @@
 {
   "name": "rootcrawl",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Profile data folders locally and read a short report instead of the files — saves tokens on photos, CSV, Excel, JSON, logs and code.",
   "author": { "name": "edshot0120-stack" },
   "homepage": "https://github.com/edshot0120-stack/seedgrown",
