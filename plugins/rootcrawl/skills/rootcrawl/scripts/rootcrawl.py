@@ -34,7 +34,7 @@ JSONS = {'.json', '.jsonl', '.ndjson'}
 TEXT = {'.txt', '.md', '.log', '.py', '.js', '.ts', '.dart', '.java', '.kt', '.go', '.rs', '.c', '.h', '.cpp',
         '.cs', '.rb', '.php', '.sh', '.yaml', '.yml', '.toml', '.ini', '.xml', '.html', '.css', '.sql'}
 SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.rootcrawl', '.venv', 'venv', 'build', '.dart_tool', '.idea'}
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 
 def human(n):
@@ -50,6 +50,21 @@ def short(s, n=60):
 
 
 # --- per-file profilers ---------------------------------------------------------------------------
+
+def detect_encoding(path):
+    with open(path, 'rb') as f:
+        head = f.read(256 * 1024)
+    if head.startswith(b'\xef\xbb\xbf'):
+        return 'utf-8-sig'
+    for enc in ('utf-8', 'cp949', 'shift_jis', 'gb18030'):
+        try:
+            head.decode(enc)
+            return enc
+        except UnicodeDecodeError as e:
+            if enc == 'utf-8' and e.start > len(head) - 4:  # a character cut at the end of the sample
+                return enc
+    return 'latin-1'
+
 
 def sniff_type(v):
     v = v.strip()
@@ -67,7 +82,8 @@ def sniff_type(v):
 
 
 def profile_table(path, sample_rows=3, max_rows=200000):
-    with open(path, 'r', encoding='utf-8-sig', errors='replace', newline='') as f:
+    enc = detect_encoding(path)
+    with open(path, 'r', encoding=enc, errors='replace', newline='') as f:
         head = f.read(64 * 1024)
         f.seek(0)
         try:
@@ -81,36 +97,45 @@ def profile_table(path, sample_rows=3, max_rows=200000):
         r = csv.reader(f, dialect)
         first = next(r, [])
         header = first if has_header else [f'col{i}' for i in range(len(first))]
-        cols = [{'name': h or f'col{i}', 'types': collections.Counter(), 'nums': [], 'vals': collections.Counter(), 'empty': 0}
-                for i, h in enumerate(header)]
+        cols = [{'name': h or f'col{i}', 'types': collections.Counter(), 'n': 0, 'sum': 0.0, 'lo': None, 'hi': None,
+                 'vals': collections.Counter(), 'more': False, 'empty': 0} for i, h in enumerate(header)]
         samples, n = [], 0
         rows = r if has_header else __import__('itertools').chain([first], r)
         for row in rows:
             n += 1
             if len(samples) < sample_rows:
                 samples.append(row)
-            if n > max_rows:
-                continue  # count only
+            typed = n <= max_rows  # types, empties and value counts from the first rows; numbers from all
             for c, v in zip(cols, row):
-                t = sniff_type(v)
-                c['types'][t] += 1
-                if t == 'empty':
-                    c['empty'] += 1
-                elif t in ('int', 'float'):
-                    if len(c['nums']) < 50000:
-                        c['nums'].append(float(v))
-                elif len(c['vals']) < 2000 or v in c['vals']:
-                    c['vals'][v] += 1
-    out = {'kind': 'table', 'rows': n, 'cols': []}
+                t = sniff_type(v) if typed else ('float' if v[:1] in '-+.0123456789' and v.strip() else 'skip')
+                if typed:
+                    c['types'][t] += 1
+                    if t == 'empty':
+                        c['empty'] += 1
+                if t in ('int', 'float'):
+                    try:
+                        x = float(v)
+                    except ValueError:
+                        continue
+                    c['n'] += 1
+                    c['sum'] += x
+                    c['lo'] = x if c['lo'] is None or x < c['lo'] else c['lo']
+                    c['hi'] = x if c['hi'] is None or x > c['hi'] else c['hi']
+                elif typed and t not in ('empty', 'skip'):
+                    if len(c['vals']) < 2000 or v in c['vals']:
+                        c['vals'][v] += 1
+                    else:
+                        c['more'] = True
+    out = {'kind': 'table', 'rows': n, 'cols': [], 'encoding': enc, 'typed_rows': min(n, max_rows)}
     for c in cols:
         t = [k for k, _ in c['types'].most_common() if k != 'empty'][:1]
         if c['types']['int'] and c['types']['float']:
             t = ['number']
-        d = {'name': c['name'], 'type': t[0] if t else 'empty', 'empty%': round(100 * c['empty'] / max(n, 1), 1)}
-        if c['nums']:
-            d.update(min=min(c['nums']), max=max(c['nums']), mean=round(statistics.fmean(c['nums']), 4))
+        d = {'name': c['name'], 'type': t[0] if t else 'empty', 'empty%': round(100 * c['empty'] / max(min(n, max_rows), 1), 1)}
+        if c['n'] and d['type'] in ('int', 'float', 'number'):
+            d.update(min=c['lo'], max=c['hi'], mean=round(c['sum'] / c['n'], 4))
         elif c['vals']:
-            d['distinct'] = len(c['vals'])
+            d['distinct'] = f'{len(c["vals"])}+' if c['more'] else len(c['vals'])
             if len(c['vals']) <= 20 or d['type'] == 'bool':
                 d['top'] = [(short(k, 24), v) for k, v in c['vals'].most_common(5)]
             else:
@@ -164,6 +189,18 @@ def profile_json(path):
                 if isinstance(o, dict):
                     keys.update(o.keys())
         return {'kind': 'jsonl', 'records': n, 'bad_lines': bad, 'keys': keys.most_common(25), 'first': shape_of(first)}
+    size = os.path.getsize(path)
+    if size > 40 * 1024 * 1024:
+        # too big to load whole: the shape of the first values, from the first 2 MB
+        with open(path, encoding='utf-8', errors='replace') as f:
+            head = f.read(2 * 1024 * 1024)
+        dec = json.JSONDecoder()
+        i = head.find('{', 1) if head.lstrip().startswith('[') else 0
+        try:
+            first, _ = dec.raw_decode(head, i)
+            return {'kind': 'json', 'shape': ['first item:', shape_of(first)], 'note': f'{human(size)}: shape read from the start only'}
+        except ValueError as e:
+            return {'kind': 'json', 'error': f'{human(size)}, start not readable: {short(e, 60)}'}
     try:
         with open(path, encoding='utf-8', errors='replace') as f:
             o = json.load(f)
@@ -179,7 +216,7 @@ def profile_text(path, max_lines=200000):
     n, chars, tss = 0, 0, []
     templates = collections.Counter()
     is_log = path.lower().endswith('.log')
-    with open(path, encoding='utf-8', errors='replace') as f:
+    with open(path, encoding=detect_encoding(path), errors='replace') as f:
         for line in f:
             n += 1
             chars += len(line)
@@ -301,7 +338,10 @@ def profile_folder(root, refresh=False, per_kind_limit=4000):
         kind = 'image' if ext in IMAGE else ext
         kind_seen[kind] += 1
         # past the limit, many files of one kind are only counted (their totals stay right)
-        prof = profile_file(p, ext) if kind_seen[kind] <= per_kind_limit else {'kind': 'image' if ext in IMAGE else 'skipped'}
+        try:
+            prof = profile_file(p, ext) if kind_seen[kind] <= per_kind_limit else {'kind': 'image' if ext in IMAGE else 'skipped'}
+        except Exception as e:  # locked, no permission, vanished, malformed: report it, keep going
+            prof = {'kind': 'unreadable', 'error': short(f'{type(e).__name__}: {e}', 90)}
         files[rel] = {'sig': sig, 'size': st.st_size, 'ext': ext, 'p': prof}
         fresh += 1
     cache['files'] = files
@@ -364,7 +404,9 @@ def report(root, files, fresh, secs, budget):
         for r, f in group[:8]:
             p = f['p']
             if kind == 'table':
-                w(f'### {r} — {p["rows"]} rows × {len(p["cols"])} cols, {human(f["size"])}\n')
+                w(f'### {r} — {p["rows"]:,} rows × {len(p["cols"])} cols, {human(f["size"])}'
+                  + (f' (types and value counts from the first {p["typed_rows"]:,} rows; numbers from all)' if p.get('typed_rows', p['rows']) < p['rows'] else '')
+                  + (f', {p["encoding"]}' if p.get('encoding') not in (None, 'utf-8', 'utf-8-sig') else '') + '\n')
                 for c in p['cols'][:30]:
                     extra = ''
                     if 'min' in c:
@@ -404,6 +446,11 @@ def report(root, files, fresh, secs, budget):
         for r, f in sorted(texts, key=lambda rf: -rf[1]['size'])[:10]:
             w(f'- {r} — {f["p"]["lines"]} lines (~{f["p"]["approx_tokens"]:,} tokens)\n')
     # what reading it all would cost: text at ~4 bytes a token, each image ~1,600 tokens to look at
+    bad = [(r, f['p']['error']) for r, f in files.items() if f['p'].get('kind') == 'unreadable']
+    if bad:
+        w(f'\n## Could not read: {len(bad)}\n')
+        for r, e in bad[:8]:
+            w(f'- {r}: {e}\n')
     raw_tokens = sum(f['size'] // 4 for f in files.values() if f['p'].get('kind') in ('table', 'json', 'jsonl', 'text', 'log', 'xlsx'))         + 1600 * sum(1 for f in files.values() if f['p'].get('kind') == 'image')
     text = out.getvalue()
     if len(text) // 4 > budget:
