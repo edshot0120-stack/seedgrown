@@ -8,6 +8,7 @@ the slices that matter are read after that.
     rootcrawl.py images PATH [--make SONY] [--software Lightroom] [--limit 30]
     rootcrawl.py pairs PATH                 # same-name files in different places / formats
     rootcrawl.py peek FILE [--lines 40]     # the first lines of any text file
+    rootcrawl.py web outline URL            # a web page's outline instead of its HTML (rootweb.py)
 
 Standard library only; Pillow (EXIF) and openpyxl (xlsx) are used when installed.
 Profiles are cached per file (size + mtime) in the user's cache folder (never inside the data
@@ -519,6 +520,11 @@ def cmd_peek(a):
 
 
 def main():
+    # web pages: `rootcrawl.py web outline|section|find|links …` (rootweb.py)
+    if len(sys.argv) > 1 and sys.argv[1] == 'web':
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import rootweb
+        return rootweb.main(sys.argv[2:])
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     ap = argparse.ArgumentParser(description='Root Crawl: profile data locally, read less.')

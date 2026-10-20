@@ -20,6 +20,27 @@ gives the AI a short report instead of the files.
 \* text files at ~4 bytes a token; each image counted as ~1,600 tokens to look at. Real sessions
 rarely read everything, but they often read far more than they need — that's the gap.
 
+### Web pages (`rootcrawl.py web …`)
+
+The outline of a page instead of its HTML or full text, then `section` / `find` / `links` on
+request. On nine real pages (`bench_web.py`, tokens ≈ characters / 4):
+
+| page | outline | page text | HTML | vs HTML |
+|---|---|---|---|---|
+| Wikipedia article (en) | 815 | 5,436 | 52,266 | ×64 |
+| Wikipedia article (ko) | 869 | 3,589 | 53,413 | ×61 |
+| Python docs page | 536 | 5,471 | 24,884 | ×46 |
+| MDN reference page | 1,513* | 9,093 | 61,823 | ×41 |
+| GitHub repo page | 1,194 | 1,897 | 72,588 | ×61 |
+| Hacker News front page | 376 | 966 | 8,491 | ×23 |
+| BBC News front page | 1,513* | 2,104 | 92,250 | ×61 |
+| flutter.dev docs | 428 | 2,552 | 33,566 | ×78 |
+| anthropic.com/news | 677 | 804 | 108,265 | ×160 |
+
+\* cut at the default 1,500-token budget. Against the page's plain text the saving is ×2–×10 on
+long articles and small on short pages — the outline's job there is to say *where* to look.
+Pages that render their content with JavaScript come back thin; use a browser tool for those.
+
 What the report covers: folders and sizes by type; photos (cameras, editing software,
 resolution, dates, names that appear as originals and edits); tables (rows, columns, types,
 empty %, ranges, top values, sample rows); Excel sheets; JSON shape; logs (time range, most
@@ -45,5 +66,6 @@ python skills/rootcrawl/scripts/rootcrawl.py table ./data/sales.csv --where "reg
 ```
 
 Standard library only (Pillow / openpyxl optional). Results are cached per file in your user
-cache folder (`%LOCALAPPDATA%ootcrawl` or `~/.cache/rootcrawl`, override with `ROOTCRAWL_CACHE`)
+cache folder (`%LOCALAPPDATA%
+ootcrawl` or `~/.cache/rootcrawl`, override with `ROOTCRAWL_CACHE`)
 — the data folder itself is never written to. Nothing is uploaded anywhere.

@@ -1,6 +1,6 @@
 ---
 name: rootcrawl
-description: Profile a folder of data (photos, CSV/TSV, Excel, JSON/JSONL, logs, text, code) locally and read a short report instead of the files, then pull only the slices needed. Use before opening, listing or reading many or large data files — "analyse this dataset", "what's in this folder", "find the photos from camera X", "rows where …" — to save tokens.
+description: Profile a folder of data (photos, CSV/TSV, Excel, JSON/JSONL, logs, text, code) or a web page locally and read a short report instead of the raw files or HTML, then pull only the slices needed. Use before opening, listing or reading many or large data files, or before fetching / reading a long web page — "analyse this dataset", "what's in this folder", "rows where …", "what does this page say about X" — to save tokens.
 ---
 
 # Root Crawl
@@ -27,6 +27,17 @@ The script is `scripts/rootcrawl.py` in this skill's base directory. It needs Py
      `rootcrawl.py pairs FOLDER`
    - the first lines of a text file: `rootcrawl.py peek FILE --lines 40`
 4. Open a whole file only when a slice can't answer the question, and say why.
+
+## Web pages
+
+Instead of fetching a page's HTML (often 30k–100k tokens) or its full text, read its outline
+(title, headings with each section's opening, tables, forms, the links in the content):
+`rootcrawl.py web outline URL` (`--budget 800` for less). Then:
+- one section in full: `rootcrawl.py web section URL "heading text"`
+- where words appear: `rootcrawl.py web find URL "words"`
+- links, filtered: `rootcrawl.py web links URL --match pricing`
+A saved `.html` file works in place of the URL. Pages are cached for an hour. Pages that
+build their content with JavaScript may come back thin; then use a browser tool.
 
 ## Notes
 
