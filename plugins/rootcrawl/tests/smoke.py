@@ -10,8 +10,8 @@ S = os.path.join(HERE, '..', 'skills', 'rootcrawl', 'scripts', 'rootcrawl.py')
 
 
 def run(*args):
-    r = subprocess.run([sys.executable, S, *args], capture_output=True, text=True, encoding='utf-8', env={**os.environ, 'ROOTCRAWL_CACHE': CACHE})
-    return r.stdout + r.stderr
+    r = subprocess.run([sys.executable, S, *args], capture_output=True, text=True, encoding='utf-8', errors='replace', env={**os.environ, 'ROOTCRAWL_CACHE': CACHE})
+    return (r.stdout or '') + (r.stderr or '')
 
 
 T = tempfile.mkdtemp()

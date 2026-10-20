@@ -333,6 +333,9 @@ def unmangle(argv):
     return out
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):  # UTF-8 output, errors included (Korean paths, …)
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8')
     import argparse
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')

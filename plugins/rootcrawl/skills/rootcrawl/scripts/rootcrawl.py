@@ -531,6 +531,9 @@ def unmangle(argv):
     return out
 
 def main():
+    for stream in (sys.stdout, sys.stderr):  # UTF-8 output, errors included (Korean paths, …)
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8')
     # web pages (rootweb.py), code (rootcode.py), and the savings so far (savings.py)
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     if len(sys.argv) > 1 and sys.argv[1] == 'web':
