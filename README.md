@@ -26,6 +26,18 @@ What survived was a judge built to be hard to fool:
 | **clipping** | extra pixels at pure black / white | lost detail |
 | **blind A/B** (`blind.py`) | side-by-side sheets, sides randomised, key opened after judging | anything the numbers miss |
 
+## Root Crawl — save tokens on data (Claude Code plugin)
+
+Profiles a folder **locally** and hands the AI a short report instead of the files: 1,276 photos
+and a CSV become **~384 tokens** instead of ~2 million to look at them; a 74-file app source folder
+becomes ~230 tokens instead of ~166,000. Then it reads slices (filtered rows, photos by camera,
+original ↔ edit pairs), not whole files. Details: [plugins/rootcrawl](plugins/rootcrawl).
+
+```
+/plugin marketplace add edshot0120-stack/seedgrown
+/plugin install rootcrawl@seedgrown
+```
+
 ## The `lut` module
 
 A ~100k-parameter CNN looks at the photo once (128 px) and weights 8 learned 17³ basis tables into one
@@ -94,4 +106,5 @@ best-effort.
 - 8개 모델을 학습했고, 통계 지표로는 이겼지만 실제로는 색을 물들이거나 대비를 낮춘 모델들을 심판이 걸러냈습니다.
 - 채택된 모델: 같은 장면 DSLR 비교 10.0 → 8.1, 클리핑 0.82% → 0.13%, 블라인드 비교 13 : 4 승.
 - 사진은 재배포하지 않으며 출처와 라이선스는 `docs/DATA.md`에 정리했습니다.
+- **Root Crawl 플러그인**: 데이터 폴더를 로컬에서 먼저 요약해, AI가 파일 대신 짧은 보고서만 읽게 합니다(사진 1,276장 ≈ 384토큰).
 - 라이선스: AGPL-3.0, 상업 제품에 넣으려면 별도 상업 라이선스.

@@ -1,0 +1,16 @@
+{
+  "name": "seedgrown",
+  "owner": {
+    "name": "edshot0120-stack"
+  },
+  "plugins": [
+    {
+      "name": "rootcrawl",
+      "source": "./plugins/rootcrawl",
+      "description": "Profile data folders locally and read a short report instead of the files — saves tokens."
+    }
+  ],
+  "metadata": {
+    "description": "Seed Grown: micro AIs and data tools that run locally. Root Crawl profiles data folders so AI reads a short report instead of the files."
+  }
+}
