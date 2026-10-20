@@ -1,15 +1,30 @@
 # Seed Grown
 
-**Tiny on-device AIs that learn from the data where they're planted — and are only kept when a judge they can't fool says they're better.**
+Small local tools and micro AIs that learn from the data where they're planted.
 
-Seed Grown is a small research codebase for making *micro AIs*: models of a few hundred kilobytes
-that run on a phone or an offline PC, learn from local data, and are verified on real data before
-they're deployed. Its first module is **`lut`**: a scene-adaptive colour model that turns a phone
-photo's rendering toward a dedicated camera's, used in the photo app [Tintly](#about).
+## ⭐ Root Crawl — read less, know more (Claude Code plugin)
 
-> 한국어 요약은 [아래](#한국어-요약)에 있습니다.
+Your AI reads a **short report instead of files, source code or HTML** — then only the slices it needs.
 
-## Why
+![Root Crawl savings](docs/img/rootcrawl-savings.png)
+
+```
+/plugin marketplace add edshot0120-stack/seedgrown
+/plugin install rootcrawl@seedgrown
+```
+
+| what | how | saved (measured) |
+|---|---|---|
+| data folders (photos, CSV/Excel, JSON, logs) | `profile` → `table` / `images` / `pairs` / `peek` | 1,276 photos: 387 tokens instead of ~2 M |
+| codebases (12 languages) | `code map` → `code symbol` → `code lines` | finding one function: 410 instead of 21,000 |
+| web pages | `web outline` → `section` / `find` / `links` | 7–35× vs the page text, 23–160× vs HTML |
+| what it saved you | `savings` | running total of every answer |
+
+Runs locally, standard-library Python, nothing uploaded; caches outside your data folders.
+Tested on 1,000,000-row CSVs, locked files, Korean CP949 files, nine real websites —
+[details and limits](plugins/rootcrawl).
+
+## Micro AIs: why a judge they can't fool
 
 Training a small model is easy. **Knowing whether it actually helps is the hard part.** While building
 `lut` we trained eight models; several looked clearly better on synthetic tests and on
@@ -25,18 +40,6 @@ What survived was a judge built to be hard to fool:
 | **fidelity** (`realscore.py`) | neutrals gaining colour; hue rotation on colourful pixels | colour casts |
 | **clipping** | extra pixels at pure black / white | lost detail |
 | **blind A/B** (`blind.py`) | side-by-side sheets, sides randomised, key opened after judging | anything the numbers miss |
-
-## Root Crawl — save tokens on data (Claude Code plugin)
-
-Profiles a folder **locally** and hands the AI a short report instead of the files: 1,276 photos
-and a CSV become **~384 tokens** instead of ~2 million to look at them; a 74-file app source folder
-becomes ~230 tokens instead of ~166,000. Then it reads slices (filtered rows, photos by camera,
-original ↔ edit pairs), not whole files. Details: [plugins/rootcrawl](plugins/rootcrawl).
-
-```
-/plugin marketplace add edshot0120-stack/seedgrown
-/plugin install rootcrawl@seedgrown
-```
 
 ## The `lut` module
 
