@@ -1,3 +1,5 @@
+> **Moved:** Root Crawl now lives at [edshot0120-stack/rootcrawl](https://github.com/edshot0120-stack/rootcrawl).
+
 # Root Crawl — read less, know more
 
 A Claude Code plugin (and a standalone script) that profiles a folder of data **locally** and
@@ -94,6 +96,5 @@ python skills/rootcrawl/scripts/rootcrawl.py table ./data/sales.csv --where "reg
 ```
 
 Standard library only (Pillow / openpyxl optional). Results are cached per file in your user
-cache folder (`%LOCALAPPDATA%
-ootcrawl` or `~/.cache/rootcrawl`, override with `ROOTCRAWL_CACHE`)
+cache folder (`%LOCALAPPDATA%\rootcrawl` or `~/.cache/rootcrawl`, override with `ROOTCRAWL_CACHE`)
 — the data folder itself is never written to. Nothing is uploaded anywhere.

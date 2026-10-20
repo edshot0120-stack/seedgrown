@@ -2,27 +2,17 @@
 
 Small local tools and micro AIs that learn from the data where they're planted.
 
-## ⭐ Root Crawl — read less, know more (Claude Code plugin)
+## Root Crawl has moved → [edshot0120-stack/rootcrawl](https://github.com/edshot0120-stack/rootcrawl)
 
-Your AI reads a **short report instead of files, source code or HTML** — then only the slices it needs.
-
-![Root Crawl savings](docs/img/rootcrawl-savings.png)
+The Claude Code plugin that lets an AI read a short local report instead of your files, source code
+or web pages, born here as Seed Grown's first step, now has its own repository:
 
 ```
-/plugin marketplace add edshot0120-stack/seedgrown
-/plugin install rootcrawl@seedgrown
+/plugin marketplace add edshot0120-stack/rootcrawl
+/plugin install rootcrawl@rootcrawl
 ```
 
-| what | how | saved (measured) |
-|---|---|---|
-| data folders (photos, CSV/Excel, JSON, logs) | `profile` → `table` / `images` / `pairs` / `peek` | 1,276 photos: 387 tokens instead of ~2 M |
-| codebases (12 languages) | `code map` → `code symbol` → `code lines` | finding one function: 410 instead of 21,000 |
-| web pages | `web outline` → `section` / `find` / `links` | 7–35× vs the page text, 23–160× vs HTML |
-| what it saved you | `savings` | running total of every answer |
-
-Runs locally, standard-library Python, nothing uploaded; caches outside your data folders.
-Tested on 1,000,000-row CSVs, locked files, Korean CP949 files, nine real websites —
-[details and limits](plugins/rootcrawl).
+(The old `rootcrawl@seedgrown` install keeps working for now, but new versions ship there.)
 
 ## Micro AIs: why a judge they can't fool
 
@@ -109,5 +99,5 @@ best-effort.
 - 8개 모델을 학습했고, 통계 지표로는 이겼지만 실제로는 색을 물들이거나 대비를 낮춘 모델들을 심판이 걸러냈습니다.
 - 채택된 모델: 같은 장면 DSLR 비교 10.0 → 8.1, 클리핑 0.82% → 0.13%, 블라인드 비교 13 : 4 승.
 - 사진은 재배포하지 않으며 출처와 라이선스는 `docs/DATA.md`에 정리했습니다.
-- **Root Crawl 플러그인**: 데이터 폴더를 로컬에서 먼저 요약해, AI가 파일 대신 짧은 보고서만 읽게 합니다(사진 1,276장 ≈ 384토큰).
+- **Root Crawl 플러그인**은 별도 저장소로 옮겼습니다: github.com/edshot0120-stack/rootcrawl
 - 라이선스: AGPL-3.0, 상업 제품에 넣으려면 별도 상업 라이선스.
