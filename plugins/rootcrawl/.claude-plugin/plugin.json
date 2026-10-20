@@ -1,7 +1,7 @@
 {
   "name": "rootcrawl",
-  "version": "0.2.0",
-  "description": "Profile data folders and web pages locally and read a short report instead of the files or HTML — saves tokens on photos, CSV, Excel, JSON, logs, code and long pages.",
+  "version": "0.3.0",
+  "description": "Read less, know more: profile data folders, map codebases and outline web pages locally — the AI reads a short report instead of files, source or HTML. Tracks the tokens saved.",
   "author": {
     "name": "edshot0120-stack"
   },

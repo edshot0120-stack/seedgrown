@@ -1,6 +1,6 @@
 ---
 name: rootcrawl
-description: Profile a folder of data (photos, CSV/TSV, Excel, JSON/JSONL, logs, text, code) or a web page locally and read a short report instead of the raw files or HTML, then pull only the slices needed. Use before opening, listing or reading many or large data files, or before fetching / reading a long web page — "analyse this dataset", "what's in this folder", "rows where …", "what does this page say about X" — to save tokens.
+description: Read less to know more — profile a data folder (photos, CSV/TSV, Excel, JSON/JSONL, logs, text), map a codebase (classes / functions with line numbers), or outline a web page, locally, and read the short report instead of the files, source or HTML; then take only the slices needed. Use before reading many or large data files, before exploring an unfamiliar codebase to find where something lives, and before fetching or reading a long web page.
 ---
 
 # Root Crawl
@@ -27,6 +27,21 @@ The script is `scripts/rootcrawl.py` in this skill's base directory. It needs Py
      `rootcrawl.py pairs FOLDER`
    - the first lines of a text file: `rootcrawl.py peek FILE --lines 40`
 4. Open a whole file only when a slice can't answer the question, and say why.
+
+## Code
+
+Before reading source files to find where something is, map the codebase:
+`rootcrawl.py code map FOLDER` — every file's classes, functions and methods with line numbers,
+most-referenced first (`--files 80 --budget 8000` for the whole map). Then:
+- where a name is defined and used: `rootcrawl.py code symbol FOLDER NAME`
+- just the lines you need: `rootcrawl.py code lines FILE 120 180`
+Helper functions defined inside other functions aren't listed in the map; `code symbol` still
+finds their uses.
+
+## Savings
+
+`rootcrawl.py savings` shows the tokens Root Crawl used against reading the same things
+directly (`savings 7` for the last week). Mention it when the user asks what it saved.
 
 ## Web pages
 

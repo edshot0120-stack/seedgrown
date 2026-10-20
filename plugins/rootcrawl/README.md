@@ -20,6 +20,34 @@ gives the AI a short report instead of the files.
 \* text files at ~4 bytes a token; each image counted as ~1,600 tokens to look at. Real sessions
 rarely read everything, but they often read far more than they need — that's the gap.
 
+### Code (`rootcrawl.py code …`)
+
+`code map` lists every file's classes, functions and methods with line numbers, most-referenced
+first; `code symbol NAME` gives the definition and every use; `code lines FILE A B` reads just
+those lines. Python by its own parser; Dart, JS/TS, Java, Kotlin, Swift, Go, Rust, C/C++/C#,
+PHP and Ruby by declaration patterns.
+
+| codebase | files | map (default) | full map | reading all files |
+|---|---|---|---|---|
+| a Flutter app (`lib/`, Dart) | 74 | 2,514 tokens | 10,143 (all 946 declarations) | 161,839 |
+
+Finding where the app develops a RAW shot: `code symbol lib _developNow` (112 tokens) →
+`code lines camera_screen.dart 722 760` (~300) instead of reading the 21,000-token file.
+
+### Savings ledger (`rootcrawl.py savings`)
+
+Every answer records what it cost and what reading the source directly would have
+(conservatively: a page's plain text, not its HTML). After one test round:
+
+| command | used | reading directly |
+|---|---|---|
+| profile (1,276 photos) | 387 | 2,066,384 |
+| code map | 2,530 | 161,839 |
+| table (filtered rows) | 80 | 26,384 |
+| code symbol | 112 | 21,260 |
+| code lines | 302 | 21,260 |
+| web outline | 551 | 5,471 |
+
 ### Web pages (`rootcrawl.py web …`)
 
 The outline of a page instead of its HTML or full text, then `section` / `find` / `links` on

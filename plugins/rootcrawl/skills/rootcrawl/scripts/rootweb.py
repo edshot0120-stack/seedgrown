@@ -333,13 +333,21 @@ def main(argv=None):
     a = ap.parse_args(argv)
     try:
         if a.cmd == 'outline':
-            print(outline(a.src, a.budget))
+            text = outline(a.src, a.budget)
         elif a.cmd == 'section':
-            print(section(a.src, a.heading))
+            text = section(a.src, a.heading)
         elif a.cmd == 'find':
-            print(find(a.src, a.words, a.around))
+            text = find(a.src, a.words, a.around)
         else:
-            print(links(a.src, a.match, a.limit))
+            text = links(a.src, a.match, a.limit)
+        print(text)
+        try:
+            import savings
+            p, _ = parse(a.src)
+            page_text = sum(len(b[2]) for b in p.blocks) // 4
+            savings.record('web ' + a.cmd, a.src, len(text) // 4, max(page_text, len(text) // 4))
+        except Exception:
+            pass
     except (OSError, ValueError) as e:
         sys.exit(f'rootweb: could not read {a.src}: {e}')
 

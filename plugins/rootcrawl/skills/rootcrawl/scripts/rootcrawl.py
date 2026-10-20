@@ -520,11 +520,21 @@ def cmd_peek(a):
 
 
 def main():
-    # web pages: `rootcrawl.py web outline|section|find|links …` (rootweb.py)
+    # web pages (rootweb.py), code (rootcode.py), and the savings so far (savings.py)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     if len(sys.argv) > 1 and sys.argv[1] == 'web':
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import rootweb
         return rootweb.main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == 'code':
+        import rootcode
+        return rootcode.main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == 'savings':
+        import savings
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8')
+        days = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else None
+        print(savings.report(days))
+        return
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
     ap = argparse.ArgumentParser(description='Root Crawl: profile data locally, read less.')
@@ -553,18 +563,39 @@ def main():
     target = getattr(a, 'path', None) or getattr(a, 'file', None)
     if not os.path.exists(target):
         sys.exit(f'rootcrawl: no such file or folder: {target}')
+    import savings
     if a.cmd == 'profile' and os.path.isfile(a.path):
         ext = os.path.splitext(a.path)[1].lower()
-        print(f'# Root Crawl: {os.path.abspath(a.path)} ({human(os.path.getsize(a.path))})')
-        print(json.dumps(profile_file(a.path, ext), ensure_ascii=False, indent=1, default=str)[: a.budget * 4])
+        text = f'# Root Crawl: {os.path.abspath(a.path)} ({human(os.path.getsize(a.path))})\n' + \
+            json.dumps(profile_file(a.path, ext), ensure_ascii=False, indent=1, default=str)[: a.budget * 4]
+        print(text)
+        size = os.path.getsize(a.path)
+        savings.record('profile', a.path, len(text) // 4, 1600 if ext in IMAGE else size // 4)
         return
     if a.cmd in ('images', 'pairs') and not os.path.isdir(a.path):
         sys.exit(f'rootcrawl: {a.cmd} needs a folder: {a.path}')
     if a.cmd == 'profile':
         files, fresh, secs = profile_folder(a.path, refresh=a.refresh)
-        print(report(a.path, files, fresh, secs, a.budget))
+        text = report(a.path, files, fresh, secs, a.budget)
+        print(text)
+        direct = int(re.findall(r'directly ≈ ([\d,]+)', text)[-1].replace(',', '')) if 'directly ≈' in text else 0
+        savings.record('profile', a.path, len(text) // 4, direct)
     else:
-        {'table': cmd_table, 'images': cmd_images, 'pairs': cmd_pairs, 'peek': cmd_peek}[a.cmd](a)
+        buf = io.StringIO()
+        real = sys.stdout
+        sys.stdout = buf
+        try:
+            {'table': cmd_table, 'images': cmd_images, 'pairs': cmd_pairs, 'peek': cmd_peek}[a.cmd](a)
+        finally:
+            sys.stdout = real
+        text = buf.getvalue()
+        real.write(text)
+        # a slice instead of the whole file (table / peek) or the whole folder listing (images / pairs)
+        src = a.file if a.cmd in ('table', 'peek') else a.path
+        direct = os.path.getsize(src) // 4 if os.path.isfile(src) else len(text) // 4
+        if a.cmd in ('images', 'pairs'):
+            direct = sum(1 for _ in walk(src)) * 12  # a listing: ~12 tokens a file
+        savings.record(a.cmd, src, len(text) // 4, max(direct, len(text) // 4))
 
 
 if __name__ == '__main__':
