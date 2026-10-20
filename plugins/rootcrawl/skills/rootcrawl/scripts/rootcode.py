@@ -241,6 +241,17 @@ def lines(path, a, b):
     return '\n'.join(out)
 
 
+
+def unmangle(argv):
+    """Undo Git Bash's path conversion of arguments that began with "/" (MSYS on Windows)."""
+    if os.name != 'nt':
+        return argv
+    out = []
+    for a in argv:
+        m = re.match(r'^[A-Za-z]:[/\\](?:Program Files[/\\]Git|msys64|usr)([/\\].*)$', a)
+        out.append(m.group(1).replace('\\', '/') if m and not os.path.exists(a) else a)
+    return out
+
 def main(argv=None):
     import argparse
     if hasattr(sys.stdout, 'reconfigure'):
@@ -259,7 +270,7 @@ def main(argv=None):
     ln.add_argument('file')
     ln.add_argument('start', type=int)
     ln.add_argument('end', type=int)
-    a = ap.parse_args(argv)
+    a = ap.parse_args(unmangle(sys.argv[1:] if argv is None else argv))
     target = getattr(a, 'path', None) or a.file
     if not os.path.exists(target):
         sys.exit(f'rootcode: no such file or folder: {target}')

@@ -519,6 +519,17 @@ def cmd_peek(a):
             sys.stdout.write(short(line.rstrip('\n'), 300) + '\n')
 
 
+
+def unmangle(argv):
+    """Undo Git Bash's path conversion of arguments that began with "/" (MSYS on Windows)."""
+    if os.name != 'nt':
+        return argv
+    out = []
+    for a in argv:
+        m = re.match(r'^[A-Za-z]:[/\\](?:Program Files[/\\]Git|msys64|usr)([/\\].*)$', a)
+        out.append(m.group(1).replace('\\', '/') if m and not os.path.exists(a) else a)
+    return out
+
 def main():
     # web pages (rootweb.py), code (rootcode.py), and the savings so far (savings.py)
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -559,7 +570,7 @@ def main():
     pk = sp.add_parser('peek')
     pk.add_argument('file')
     pk.add_argument('--lines', type=int, default=40)
-    a = ap.parse_args()
+    a = ap.parse_args(unmangle(sys.argv[1:]))
     target = getattr(a, 'path', None) or getattr(a, 'file', None)
     if not os.path.exists(target):
         sys.exit(f'rootcrawl: no such file or folder: {target}')

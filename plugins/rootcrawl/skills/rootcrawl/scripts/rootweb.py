@@ -20,6 +20,7 @@ import re
 import sys
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 from html.parser import HTMLParser
 
@@ -53,11 +54,19 @@ def fetch(src, max_age=3600):
     path = cache_file(src)
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < max_age:
         return open(path, encoding='utf-8', errors='replace').read(), src
-    req = urllib.request.Request(src, headers={'User-Agent': 'Mozilla/5.0 (rootcrawl; +https://github.com/edshot0120-stack/seedgrown)',
-                                               'Accept-Language': 'en,ko;q=0.8'})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        raw = r.read(8 * 1024 * 1024)
-        enc = r.headers.get_content_charset() or 'utf-8'
+    req = urllib.request.Request(src, headers={
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en,ko;q=0.8'})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            raw = r.read(8 * 1024 * 1024)
+            enc = r.headers.get_content_charset() or 'utf-8'
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403, 429, 503):
+            raise OSError(f'the site refused a direct request (HTTP {e.code}); read it with a browser tool, '
+                          f'or save the page as .html and run this on the file') from None
+        raise
     text = raw.decode(enc, errors='replace')
     with open(path, 'w', encoding='utf-8') as f:
         f.write(text)
@@ -291,9 +300,11 @@ def find(src, words, around):
     for kind, lv, t, _, _ in blocks:
         if kind == 'h':
             head = t
-        i = t.lower().find(words.lower())
-        if i >= 0:
+        low, w = t.lower(), words.lower()
+        i = low.find(w)
+        while i >= 0:  # every occurrence in the block, not just the first
             hits.append(f'[{short(head, 50)}] …{t[max(0, i - around): i + len(words) + around]}…')
+            i = low.find(w, i + len(w))
     return '\n'.join(hits[:12]) + f'\n# {len(hits)} matches' if hits else f'# no match for "{words}"'
 
 
@@ -309,6 +320,17 @@ def links(src, match, limit):
         out.append(f'{"·" if chrome else "-"} {short(t, 70)} → {h}')
     return '\n'.join(out[:limit]) + f'\n# {len(out)} links ({"·" if True else ""} = menu / footer)'
 
+
+
+def unmangle(argv):
+    """Undo Git Bash's path conversion of arguments that began with "/" (MSYS on Windows)."""
+    if os.name != 'nt':
+        return argv
+    out = []
+    for a in argv:
+        m = re.match(r'^[A-Za-z]:[/\\](?:Program Files[/\\]Git|msys64|usr)([/\\].*)$', a)
+        out.append(m.group(1).replace('\\', '/') if m and not os.path.exists(a) else a)
+    return out
 
 def main(argv=None):
     import argparse
@@ -330,7 +352,7 @@ def main(argv=None):
     l.add_argument('src')
     l.add_argument('--match')
     l.add_argument('--limit', type=int, default=40)
-    a = ap.parse_args(argv)
+    a = ap.parse_args(unmangle(sys.argv[1:] if argv is None else argv))
     try:
         if a.cmd == 'outline':
             text = outline(a.src, a.budget)
